@@ -1,10 +1,12 @@
 namespace Sample.Worker
 {
+    using System;
     using System.Threading.Tasks;
     using Consumers;
     using Contracts;
     using MassTransit;
     using Microsoft.Extensions.Configuration;
+    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Hosting;
     using StateMachines;
 
@@ -29,6 +31,7 @@ namespace Sample.Worker
 
                         x.AddConsumer<SubmitOrderConsumer>();
                         x.AddConsumer<OrderSubmittedConsumer>();
+                        x.AddConsumer<TestConsumer>();
 
                         x.AddSagaStateMachine<OrderShipmentStateMachine, OrderShipmentState, OrderShipmentSagaDefinition>()
                             .MessageSessionRepository();
@@ -48,9 +51,20 @@ namespace Sample.Worker
                                 e.ConfigureConsumer<OrderSubmittedConsumer>(context);
                             });
 
-                            cfg.ConfigureEndpoints(context);
+                            cfg.ReceiveEndpoint("test-receive", e =>
+                            {
+                                //These are just to repeat tests faster
+                                e.PrefetchCount = 2;
+                                e.LockDuration = TimeSpan.FromMinutes(2);
+
+                                e.Consumer<TestConsumer>(context, c => c.UseConcurrentMessageLimit(1));
+                            });
+
+                            //cfg.ConfigureEndpoints(context);
                         });
                     });
+
+                    services.AddHostedService<GracefulStopperHostedService>();
                 });
         }
     }
